@@ -336,6 +336,13 @@ class PrivateRequestMixin:
                             % (message, last_json.get("feedback_message")),
                         )
                     )
+                elif message == "consent_required":
+                    print(self.last_json)
+                    # ConsentRequired(**last_json)
+                    self.handle_consent_required("/terms/unblock/")
+                    # "/notifications/badge/",
+                    print(self.last_json)
+                    
                 elif error_type == "sentry_block":
                     raise SentryBlock(**last_json)
                 elif error_type == "rate_limit_error":

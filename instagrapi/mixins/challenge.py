@@ -78,6 +78,37 @@ class ChallengeResolveMixin:
             return self.challenge_resolve_contact_form(challenge_url)
         return self.challenge_resolve_simple(challenge_url)
 
+    def _init_session(self, challenge_url: str):
+        result = self.last_json
+        challenge_url = "https://i.instagram.com%s" % challenge_url
+        session = requests.Session()
+        session.verify = False  # fix SSLError/HTTPSConnectionPool
+        session.proxies = self.private.proxies
+        session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 8.0.0; MI 5s Build/OPR1.170623.032; wv) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/80.0.3987.149 "
+                "Mobile Safari/537.36 %s" % self.user_agent,
+                "upgrade-insecure-requests": "1",
+                "sec-fetch-dest": "document",
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+                "x-requested-with": "com.instagram.android",
+                "sec-fetch-site": "none",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-user": "?1",
+                "accept-encoding": "gzip, deflate",
+                "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
+                "pragma": "no-cache",
+                "cache-control": "no-cache",
+            }
+        )
+        for key, value in self.private.cookies.items():
+            if key in ["mid", "csrftoken"]:
+                session.cookies.set(key, value)
+        time.sleep(WAIT_SECONDS)
+        
+        return session, result, enc_password
+
     def challenge_resolve_contact_form(self, challenge_url: str) -> bool:
         """
         Start challenge resolve
@@ -106,35 +137,7 @@ class ChallengeResolveMixin:
         bool
             A boolean value
         """
-        result = self.last_json
-        challenge_url = "https://i.instagram.com%s" % challenge_url
-        enc_password = "#PWD_INSTAGRAM_BROWSER:0:%s:" % str(int(time.time()))
-        instagram_ajax = hashlib.sha256(enc_password.encode()).hexdigest()[:12]
-        session = requests.Session()
-        session.verify = False  # fix SSLError/HTTPSConnectionPool
-        session.proxies = self.private.proxies
-        session.headers.update(
-            {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 8.0.0; MI 5s Build/OPR1.170623.032; wv) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/80.0.3987.149 "
-                "Mobile Safari/537.36 %s" % self.user_agent,
-                "upgrade-insecure-requests": "1",
-                "sec-fetch-dest": "document",
-                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-                "x-requested-with": "com.instagram.android",
-                "sec-fetch-site": "none",
-                "sec-fetch-mode": "navigate",
-                "sec-fetch-user": "?1",
-                "accept-encoding": "gzip, deflate",
-                "accept-language": "en-US,en;q=0.9,en-US;q=0.8,en;q=0.7",
-                "pragma": "no-cache",
-                "cache-control": "no-cache",
-            }
-        )
-        for key, value in self.private.cookies.items():
-            if key in ["mid", "csrftoken"]:
-                session.cookies.set(key, value)
-        time.sleep(WAIT_SECONDS)
+        session = self._init_session(challenge_url)
         result = session.get(challenge_url)  # render html form
         session.headers.update(
             {
@@ -524,3 +527,7 @@ class ChallengeResolveMixin:
         else:
             raise ChallengeUnknownStep(f'ChallengeResolve: Unknown step_name "{step_name}" for "{self.username}" in challenge resolver: {self.last_json}')
         return True
+
+    def handle_consent_required(self, challenge_url: str):
+        session, res, _ = self._init_session(challenge_url)
+        print(res.__dict__)
